@@ -1,427 +1,94 @@
-install.packages(c("readxl", "dplyr", "lubridate", "ggplot2"))
 library(readxl)
 library(dplyr)
 library(lubridate)
-library(ggplot2)
-fires <- read_excel("donneesouvertes-interventions-sim-2005-2014.xls")
-View(fires)
-fires <- fires %>%
-  mutate(
-    CREATION_DATE_TIME = ymd_hms(CREATION_DATE_TIME),
-    Year = year(CREATION_DATE_TIME),
-    Month = month(CREATION_DATE_TIME, label = TRUE)
-  )
-fires_per_year <- fires %>% count(Year)
-fires_per_year
-fires_arr_year <- fires %>% count(NOM_ARROND, Year)
-fires_arr_year
-fires_type_year <- fires %>% count(INCIDENT_TYPE_DESC, Year)
-fires_type_year
-ggplot(fires_per_year, aes(x = Year, y = n)) +
-  geom_line() +
-  geom_point()
-ggplot(fires_arr_year, aes(x = NOM_ARROND, y = n, fill = factor(Year))) +
-  geom_col(position = "dodge") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-fires %>% count(INCIDENT_TYPE_DESC, sort = TRUE)
-'print(n = 93)'
-building_fires <- fires %>%
-  filter(grepl("bâtiment", INCIDENT_TYPE_DESC, ignore.case = TRUE))
-View(fires_arr_year)
-View(building_fires)
-View(building_fires)
-View(fires_type_year)
-building_fires_per_year <- building_fires %>%
-  count(Year)
-building_fires_per_year
-building_fires_arr_year <- building_fires %>%
-  count(NOM_ARROND, Year)
-building_fires_arr_year
-building_fires_type_year <- building_fires %>%
-  count(INCIDENT_TYPE_DESC, Year)
-building_fires_type_year
-ggplot(building_fires_per_year, aes(x = Year, y = n)) +
-  geom_line() +
-  geom_point() +
-  labs(title = "Building Fires per Year – Montréal",
-       x = "Year",
-       y = "Number of Building Fires")
-ggplot(building_fires_arr_year, aes(x = NOM_ARROND, y = n, fill = factor(Year))) +
-  geom_col(position = "dodge") +
-  labs(title = "Building Fires per Borough per Year",
-       x = "Borough",
-       y = "Number of Building Fires",
-       fill = "Year") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-files <- list.files("Fire Project", pattern = "\\.xls$", full.names = TRUE)
-files <- list.files("Fire Project", pattern = "\\.xls$", full.names = TRUE) files
-files <- list.files("Fire Project", pattern = "\\.xls$", full.names = TRUE) files
-fires <- read_excel("donneesouvertes-interventions-sim_2015_2022.xls")
-fires <- read_excel("donneesouvertes-interventions-sim2020.xls")
-fires <- read_excel("donneesouvertes-interventions-sim-2.xls")
-all_fires <- bind_rows(fires <- read_excel("donneesouvertes-interventions-sim_2005_2014.xls, donneesouvertes-interventions-sim_2015_2022.xls, donneesouvertes-interventions-sim2020.xls, donneesouvertes-interventions-sim-2.xls
-)
-all_fires <- all_fires %>%
-mutate(
-CREATION_DATE_TIME = ymd_hms(CREATION_DATE_TIME),
-Year = year(CREATION_DATE_TIME),
-Month = month(CREATION_DATE_TIME, label = TRUE)
-)
-building_fires <- all_fires %>%
-filter(grepl("bâtiment", INCIDENT_TYPE_DESC, ignore.case = TRUE))
-building_fires <- all_fires %>%
-filter(grepl("bâtiment", INCIDENT_TYPE_DESC, ignore.case = TRUE))
-fires1 <- read_excel("donneesouvertes-interventions-sim_2005_2014.xls")
-fires1 <- read_excel("donneesouvertes-interventions-sim_2005_2014.xls")
+library(leaflet)
+library(leaflet.extras)
+
 fires1 <- read_excel("donneesouvertes-interventions-sim-2005-2014.xls")
 fires2 <- read_excel("donneesouvertes-interventions-sim_2015_2022.xls")
 fires3 <- read_excel("donneesouvertes-interventions-sim2020.xls")
 fires4 <- read_excel("donneesouvertes-interventions-sim-2.xls")
-all_fires <- bind_rows(fires1, fires2, fires3, fires4)
-library(readxl)
-library(dplyr)
-library(lubridate)
 
-fires1 <- read_excel("fire_data/donneesouvertes-interventions-sim_2005_2014.xls") %>%
-mutate(CREATION_DATE_TIME = ymd_hms(CREATION_DATE_TIME, quiet = TRUE))
-library(readxl)
-library(dplyr)
-library(lubridate)
-
-fires1 <- read_excel("fire_data/donneesouvertes-interventions-sim-2005-2014.xls") %>%
-mutate(CREATION_DATE_TIME = ymd_hms(CREATION_DATE_TIME, quiet = TRUE))
-library(dplyr)
-library(lubridate)
+fires_list <- list(fires1, fires2, fires3, fires4)
 
 fires_list <- lapply(fires_list, function(df) {
-df %>%
-mutate(
-CREATION_DATE_TIME = ymd_hms(CREATION_DATE_TIME, quiet = TRUE),
-Year = year(CREATION_DATE_TIME),
-Month = month(CREATION_DATE_TIME, label = TRUE)
-)
+  df %>%
+    mutate(
+      CREATION_DATE_TIME = ymd_hms(CREATION_DATE_TIME, quiet = TRUE),
+      Year = year(CREATION_DATE_TIME),
+      Month = month(CREATION_DATE_TIME, label = TRUE)
+    )
 })
 
 all_fires <- bind_rows(fires_list)
 
 building_fires <- all_fires %>%
-filter(grepl("bâtiment", INCIDENT_TYPE_DESC, ignore.case = TRUE)) %>%
-filter(Year >= 2005 & Year <= 2025)
+  filter(grepl("bâtiment|alerte|alarme", INCIDENT_TYPE_DESC, ignore.case = TRUE)) %>%
+  filter(!is.na(LATITUDE) & !is.na(LONGITUDE)) %>%
+  mutate(Severity = case_when(
+    grepl("5e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "5th Alarm / 5e Alarme",
+    grepl("4e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "4th Alarm / 4e Alarme",
+    grepl("3e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "3rd Alarm / 3e Alarme",
+    grepl("2e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "2nd Alarm / 2e Alarme",
+    TRUE ~ "Standard Building Fire / Feu de bâtiment"
+  ))
 
-table(building_fires$Year)
-View(building_fires)
-building_fires_per_year <- building_fires %>% count(Year)
-ggplot(building_fires_per_year, aes(x = Year, y = n)) +
-geom_line() +
-geom_point() +
-labs(title = "Building Fires per Year – Montréal",
-x = "Year",
-y = "Number of Building Fires")
-building_fires_arr_year <- building_fires %>% count(NOM_ARROND, Year)
-ggplot(building_fires_arr_year, aes(x = NOM_ARROND, y = n, fill = factor(Year))) +
-geom_col(position = "dodge") +
-labs(title = "Building Fires per Borough per Year",
-x = "Borough",
-y = "Number of Building Fires",
-fill = "Year") +
-theme(axis.text.x = element_text(angle = 45, hjust = 1))
-verdun_fires <- building_fires %>%
-filter(NOM_ARROND == "Verdun") %>%
-count(Year)
-ggplot(verdun_fires, aes(x = Year, y = n)) +
-geom_line(color = "steelblue", size = 1) +
-geom_point(color = "darkred", size = 2) +
-labs(
-title = "Building Fires in Verdun Over Time",
-x = "Year",
-y = "Number of Building Fires"
-) +
-theme_minimal()
-verdun_type_year <- building_fires %>%
-filter(NOM_ARROND == "Verdun") %>%
-count(Year, INCIDENT_TYPE_DESC)
-ggplot(verdun_type_year, aes(x = Year, y = n, fill = INCIDENT_TYPE_DESC)) +
-geom_bar(stat = "identity") +
-labs(
-title = "Building Fires by Type in Verdun",
-x = "Year",
-y = "Number of Fires",
-fill = "Incident Type"
-) +
-theme_minimal()
-montreal_fires <- building_fires %>%
-group_by(Year) %>%
-summarise(total_fires = n())
-ggplot(montreal_fires, aes(x = Year, y = total_fires)) +
-geom_line(color = "steelblue", size = 1) +
-geom_point(color = "darkred", size = 2) +
-labs(
-title = "Total Building Fires in Montréal Over Time",
-x = "Year",
-y = "Number of Building Fires"
-) +
-theme_minimal()
-montreal_by_borough <- montreal_by_borough %>%
-left_join(borough_pop, by = "NOM_ARROND") %>%
-mutate(fires_per_10k = n / Population * 10000)
-montreal_by_borough <- building_fires %>%
-group_by(Year, NOM_ARROND) %>%
-summarise(n = n(), .groups = 'drop')
-ggplot(montreal_by_borough, aes(x = Year, y = n, fill = NOM_ARROND)) +
-geom_area(alpha = 0.8) +
-labs(
-title = "Building Fires in Montréal by Borough Over Time",
-x = "Year",
-y = "Number of Building Fires",
-fill = "Borough"
-) +
-theme_minimal()
-montreal_fires <- building_fires %>%
-group_by(Year) %>%
-summarise(total_fires = n())
-ggplot(montreal_fires, aes(x = Year, y = total_fires)) +
-geom_line(color = "steelblue", size = 1) +
-geom_point(color = "darkred", size = 2) +
-labs(
-title = "Total Building Fires in Montréal Over Time",
-x = "Year",
-y = "Number of Building Fires"
-) +
-theme_minimal()
-verdun_fires <- building_fires %>%
-filter(NOM_ARROND == "Verdun") %>%
-arrange(CREATION_DATE_TIME)
-head(verdun_fires, 20)  # show first 20 rows
-verdun_fires_month <- verdun_fires %>%
-mutate(Month = month(CREATION_DATE_TIME, label = TRUE)) %>%
-count(Year, Month)
-verdun_fires_month
-ggplot(verdun_fires, aes(x = CREATION_DATE_TIME, y = INCIDENT_TYPE_DESC)) +
-geom_point(color = "red", alpha = 0.6) +
-labs(
-title = "Individual Building Fires in Verdun Over Time",
-x = "Date",
-y = "Incident Type"
-) +
-theme_minimal()
-ggplot(verdun_fires, aes(x = month(CREATION_DATE_TIME, label = TRUE))) +
-geom_bar(fill = "orange", color = "black") +
-labs(title = "Building Fires in Verdun by Month", x = "Month", y = "Count")
-library(ggmap)
-install.packages("ggmap")
-library(ggmap)
-library(ggmap)
-library(ggplot2)
-
-montreal_map <- get_stamenmap(
-bbox = c(left = -73.65, bottom = 45.45, right = -73.5, top = 45.65),
-zoom = 12,
-maptype = "toner-lite"
-)
-get_stadiamap()
-library(ggmap)
-library(ggplot2)
-
-bbox <- c(left = -73.65, bottom = 45.45, right = -73.5, top = 45.65)
-
-montreal_map <- get_stadiamap(
-bbox = bbox,
-zoom = 12,
-maptype = "toner-lite"  # similar to Stamen tiles
-)
-install.packages("leaflet")  # only if not installed
-library(leaflet)
-leaflet(fires_by_borough) %>%
-addTiles() %>%  # OpenStreetMap tiles
-addCircleMarkers(
-lng = ~LONGITUDE, lat = ~LATITUDE,
-radius = ~sqrt(Fires_per_1000) * 5,  # scale size for visibility
-color = ~colorNumeric("viridis", Fires_per_1000)(Fires_per_1000),
-fillOpacity = 0.7,
-stroke = FALSE,
-popup = ~paste(
-"Borough:", NOM_ARROND, "<br>",
-"Building Fires:", FireCount, "<br>",
-"Fires per 1000 people:", round(Fires_per_1000, 2)
-)
-) %>%
-addLegend(
-"bottomright",
-pal = colorNumeric("viridis", fires_by_borough$Fires_per_1000),
-values = ~Fires_per_1000,
-title = "Fires per 1000 people"
+pal <- colorFactor(
+  palette = c("purple", "darkred", "red", "orange", "gold"),
+  levels = c(
+    "5th Alarm / 5e Alarme", 
+    "4th Alarm / 4e Alarme", 
+    "3rd Alarm / 3e Alarme", 
+    "2nd Alarm / 2e Alarme", 
+    "Standard Building Fire / Feu de bâtiment"
+  )
 )
 
-head(building_fires[, c("NOM_ARROND", "LATITUDE", "LONGITUDE")])
-library(dplyr)
-
-fires_by_borough <- building_fires %>%
-group_by(NOM_ARROND, LATITUDE, LONGITUDE) %>%
-summarize(FireCount = n(), .groups = "drop")
-library(leaflet)
-leaflet(fires_by_borough) %>%
-addTiles() %>%
-addCircleMarkers(
-lng = ~LONGITUDE, lat = ~LATITUDE,
-radius = ~sqrt(Fires_per_1000) * 5,
-color = ~colorNumeric("viridis", Fires_per_1000)(Fires_per_1000),
-fillOpacity = 0.7,
-stroke = FALSE,
-popup = ~paste(
-"Borough:", NOM_ARROND, "<br>",
-"Building Fires:", FireCount, "<br>",
-"Fires per 1000 people:", round(Fires_per_1000, 2)
-)
-) %>%
-addLegend(
-"bottomright",
-pal = colorNumeric("viridis", fires_by_borough$Fires_per_1000),
-values = ~Fires_per_1000,
-title = "Fires per 1000 people"
-)
-
-NOM_ARROND = c(
-"Verdun",
-"Ville-Marie",
-"Plateau-Mont-Royal",
-"Rosemont–La Petite-Patrie",
-"Mercier–Hochelaga-Maisonneuve",
-"Villeray–Saint-Michel–Parc-Extension",
-"Côte-des-Neiges–Notre-Dame-de-Grâce",
-"Ahuntsic-Cartierville",
-"Lachine",
-"Outremont"
-),
-Population = c(
-67000, 106000, 103000, 141000, 137000, 148000, 166000, 133000, 43000, 23000
-)
-)
-library(dplyr)
-fires_by_borough <- building_fires %>%
-group_by(NOM_ARROND) %>%
-summarize(FireCount = n(), .groups = "drop") %>%
-left_join(population, by = "NOM_ARROND") %>%
-mutate(Fires_per_1000 = FireCount / Population * 1000)
-
-borough_coords <- data.frame(
-NOM_ARROND = population$NOM_ARROND,
-LATITUDE = c(45.45, 45.50, 45.52, 45.55, 45.57, 45.57, 45.49, 45.57, 45.42, 45.52),
-LONGITUDE = c(-73.57, -73.56, -73.58, -73.58, -73.53, -73.63, -73.63, -73.69, -73.65, -73.60)
-)
-fires_by_borough <- fires_by_borough %>%
-left_join(borough_coords, by = "NOM_ARROND")
-library(leaflet)
-leaflet(fires_by_borough) %>%
-addTiles() %>%
-addCircleMarkers(
-lng = ~LONGITUDE, lat = ~LATITUDE,
-radius = ~sqrt(Fires_per_1000) * 5,
-color = ~colorNumeric("viridis", Fires_per_1000)(Fires_per_1000),
-fillOpacity = 0.7,
-stroke = FALSE,
-popup = ~paste(
-"Borough:", NOM_ARROND, "<br>",
-"Building Fires:", FireCount, "<br>",
-"Fires per 1000 people:", round(Fires_per_1000, 2)
-)
-) %>%
-addLegend(
-"bottomright",
-pal = colorNumeric("viridis", fires_by_borough$Fires_per_1000),
-values = ~Fires_per_1000,
-title = "Fires per 1000 people"
-)
-library(leaflet)
-
-fires_map <- building_fires %>%
-filter(!is.na(LATITUDE) & !is.na(LONGITUDE))
-leaflet(fires_map) %>%
-addTiles() %>%
-addCircleMarkers(
-lng = ~LONGITUDE, lat = ~LATITUDE,
-radius = 3,
-color = "red",
-fillOpacity = 0.5,
-popup = ~paste("Borough:", NOM_ARROND, "<br>",
-"Date:", CREATION_DATE_TIME)
-)
-library(leaflet)
-library(leaflet.extras)
-install.packages("leaflet.extras")
-library(leaflet.extras)
-library(leaflet)
-library(leaflet.extras)
-leaflet(fires_map) %>%
-addTiles() %>%
-addHeatmap(
-lng = ~LONGITUDE, lat = ~LATITUDE,
-intensity = 1,
-blur = 20,
-max = 0.05
-)
-library(dplyr)
-library(lubridate)
-library(leaflet)
-verdun_fires <- building_fires %>%
-filter(grepl("Verdun", NOM_ARROND, ignore.case = TRUE)) %>%
-filter(!is.na(LATITUDE) & !is.na(LONGITUDE))  # make sure coordinates exist
-table(verdun_fires$Year)
-verdun_population <- 69000
-fires_per_1000 <- nrow(verdun_fires) / (verdun_population / 1000)
-cat("Total fires per 1,000 residents in Verdun:", round(fires_per_1000, 2), "\n")
-verdun_yearly <- verdun_fires %>%
-group_by(Year) %>%
-summarise(Fires = n()) %>%
-mutate(Fires_per_1000 = Fires / (verdun_population / 1000))
-print(verdun_yearly)
-leaflet(verdun_fires) %>%
-addTiles() %>%
-setView(lng = -73.57, lat = 45.45, zoom = 13) %>%  # Verdun center
-addCircleMarkers(
-lng = ~LONGITUDE,
-lat = ~LATITUDE,
-radius = 4,
-color = "red",
-fillOpacity = 0.6,
-popup = ~paste("Date:", CREATION_DATE_TIME, "<br>",
-"Type:", INCIDENT_TYPE_DESC)
-)
-verdun_monthly <- verdun_fires %>%
-mutate(Month = month(CREATION_DATE_TIME, label = TRUE)) %>%
-group_by(Year, Month) %>%
-summarise(Fires = n())
-ggplot(verdun_monthly, aes(x = Month, y = Fires, color = factor(Year), group = Year)) +
-geom_line() +
-geom_point() +
-labs(
-title = "Monthly Building Fires in Verdun",
-x = "Month",
-y = "Number of Fires",
-color = "Year"
-) +
-theme_minimal()
-library(ggplot2)
-
-verdun_yearly <- verdun_fires %>%
-group_by(Year) %>%
-summarise(Fires = n()) %>%
-mutate(Fires_per_1000 = Fires / (verdun_population / 1000))
-ggplot(verdun_yearly, aes(x = Year, y = Fires_per_1000)) +
-geom_line(color = "red") +
-geom_point(color = "darkred") +
-labs(
-title = "Building Fires in Verdun Over Time",
-x = "Year",
-y = "Fires per 1,000 residents"
-) +
-theme_minimal()
-library(ggplot2)
-p <- ggplot(verdun_yearly, aes(x = Year, y = Fires_per_1000)) +
-geom_line(color = "red") +
-geom_point(color = "darkred") +
-labs(
-title = "Building Fires in Verdun Over Time",
-x = "Year",
-y = "Fires per 1,000 residents"
-) +
-theme_minimal()
+leaflet(building_fires) %>%
+  addTiles(group = "Standard Map") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Light Map") %>%
+  addSearchOSM() %>%
+  addFullscreenControl() %>%
+  addMeasure(
+    position = "topleft",
+    primaryLengthUnit = "meters",
+    primaryAreaUnit = "sqmeters"
+  ) %>%
+  addCircleMarkers(
+    lng = ~LONGITUDE,
+    lat = ~LATITUDE,
+    radius = ~ifelse(grepl("Standard", Severity), 4, 8),
+    color = ~pal(Severity),
+    fillOpacity = 0.7,
+    group = "Fires by Severity",
+    clusterOptions = markerClusterOptions(),
+    popup = ~paste(
+      "<b>Borough:</b>", NOM_ARROND, "<br>",
+      "<b>Severity:</b>", Severity, "<br>",
+      "<b>Type:</b>", INCIDENT_TYPE_DESC, "<br>",
+      "<b>Date:</b>", CREATION_DATE_TIME
+    )
+  ) %>%
+  addHeatmap(
+    lng = ~LONGITUDE,
+    lat = ~LATITUDE,
+    blur = 20,
+    max = 0.05,
+    radius = 15,
+    group = "Intensity Heatmap"
+  ) %>%
+  addLayersControl(
+    baseGroups = c("Light Map", "Standard Map", "Satellite"),
+    overlayGroups = c("Fires by Severity", "Intensity Heatmap"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal,
+    values = ~Severity,
+    title = "Fire Severity Level / Niveau de gravité",
+    opacity = 0.7
+  ) %>%
+  hideGroup("Intensity Heatmap") %>%
+  setView(lng = -73.57, lat = 45.50, zoom = 11)
