@@ -1,0 +1,94 @@
+library(readxl)
+library(dplyr)
+library(lubridate)
+library(leaflet)
+library(leaflet.extras)
+
+fires1 <- read_excel("donneesouvertes-interventions-sim-2005-2014.xls")
+fires2 <- read_excel("donneesouvertes-interventions-sim_2015_2022.xls")
+fires3 <- read_excel("donneesouvertes-interventions-sim2020.xls")
+fires4 <- read_excel("donneesouvertes-interventions-sim-2.xls")
+
+fires_list <- list(fires1, fires2, fires3, fires4)
+
+fires_list <- lapply(fires_list, function(df) {
+  df %>%
+    mutate(
+      CREATION_DATE_TIME = ymd_hms(CREATION_DATE_TIME, quiet = TRUE),
+      Year = year(CREATION_DATE_TIME),
+      Month = month(CREATION_DATE_TIME, label = TRUE)
+    )
+})
+
+all_fires <- bind_rows(fires_list)
+
+building_fires <- all_fires %>%
+  filter(grepl("bâtiment|alerte|alarme", INCIDENT_TYPE_DESC, ignore.case = TRUE)) %>%
+  filter(!is.na(LATITUDE) & !is.na(LONGITUDE)) %>%
+  mutate(Severity = case_when(
+    grepl("5e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "5th Alarm / 5e Alarme",
+    grepl("4e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "4th Alarm / 4e Alarme",
+    grepl("3e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "3rd Alarm / 3e Alarme",
+    grepl("2e", INCIDENT_TYPE_DESC, ignore.case = TRUE) ~ "2nd Alarm / 2e Alarme",
+    TRUE ~ "Standard Building Fire / Feu de bâtiment"
+  ))
+
+pal <- colorFactor(
+  palette = c("purple", "darkred", "red", "orange", "gold"),
+  levels = c(
+    "5th Alarm / 5e Alarme", 
+    "4th Alarm / 4e Alarme", 
+    "3rd Alarm / 3e Alarme", 
+    "2nd Alarm / 2e Alarme", 
+    "Standard Building Fire / Feu de bâtiment"
+  )
+)
+
+leaflet(building_fires) %>%
+  addTiles(group = "Standard Map") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Light Map") %>%
+  addSearchOSM() %>%
+  addFullscreenControl() %>%
+  addMeasure(
+    position = "topleft",
+    primaryLengthUnit = "meters",
+    primaryAreaUnit = "sqmeters"
+  ) %>%
+  addCircleMarkers(
+    lng = ~LONGITUDE,
+    lat = ~LATITUDE,
+    radius = ~ifelse(grepl("Standard", Severity), 4, 8),
+    color = ~pal(Severity),
+    fillOpacity = 0.7,
+    group = "Fires by Severity",
+    clusterOptions = markerClusterOptions(),
+    popup = ~paste(
+      "<b>Borough:</b>", NOM_ARROND, "<br>",
+      "<b>Severity:</b>", Severity, "<br>",
+      "<b>Type:</b>", INCIDENT_TYPE_DESC, "<br>",
+      "<b>Date:</b>", CREATION_DATE_TIME
+    )
+  ) %>%
+  addHeatmap(
+    lng = ~LONGITUDE,
+    lat = ~LATITUDE,
+    blur = 20,
+    max = 0.05,
+    radius = 15,
+    group = "Intensity Heatmap"
+  ) %>%
+  addLayersControl(
+    baseGroups = c("Light Map", "Standard Map", "Satellite"),
+    overlayGroups = c("Fires by Severity", "Intensity Heatmap"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal = pal,
+    values = ~Severity,
+    title = "Fire Severity Level / Niveau de gravité",
+    opacity = 0.7
+  ) %>%
+  hideGroup("Intensity Heatmap") %>%
+  setView(lng = -73.57, lat = 45.50, zoom = 11)
