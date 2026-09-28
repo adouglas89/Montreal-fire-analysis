@@ -4,8 +4,12 @@ import matplotlib.pyplot as plt
 
 with open("monthly_fire_counts_verdun_all_time.json", "r") as file:
     data = json.load(file)
-print(data)
-
+print(len(data))
+a=0
+for x in data:
+   a += x[1]
+   print(x[1])
+print(a)
 data.sort()
 def format_month(month_num):
     """Convert numeric month back to yyyy/mm format"""
